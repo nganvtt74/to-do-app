@@ -2,6 +2,19 @@ import { create } from 'zustand';
 
 const useBoardStore = create((set, get) => ({
   tasks: [],
+  lists: [
+    { id: 'todo', title: 'To Do' },
+    { id: 'doing', title: 'In Progress' },
+    { id: 'done', title: 'Done' }
+  ],
+
+  // Quản lý List
+  addList: (title) => set((state) => ({
+    lists: [
+      ...state.lists, 
+      { id: `list-${Date.now()}`, title }
+    ]
+  })),
 
   // Cập nhật toàn bộ danh sách task từ API
   setTasks: (newTasks) => set({ tasks: newTasks }),
@@ -23,21 +36,25 @@ const useBoardStore = create((set, get) => ({
     tasks: state.tasks.filter((task) => task.id !== taskId)
   })),
 
+  // Xóa tất cả task của một cột
+  deleteTasksByList: (listId) => set((state) => ({
+    tasks: state.tasks.filter((task) => task.status !== listId)
+  })),
+
   // Xử lý kéo thả task
   moveTask: (taskId, sourceStatus, destinationStatus, sourceIndex, destinationIndex) => set((state) => {
-    // 1. Phân loại tất cả các tasks theo status và sắp xếp theo position hiện tại để đảm bảo index chính xác
-    const columns = {
-      todo: state.tasks.filter((task) => task.status === 'todo').sort((a, b) => a.position - b.position),
-      doing: state.tasks.filter((task) => task.status === 'doing').sort((a, b) => a.position - b.position),
-      done: state.tasks.filter((task) => task.status === 'done').sort((a, b) => a.position - b.position),
-    };
+    // 1. Phân loại tất cả các tasks theo status linh động dựa trên cột hiện có
+    const columns = {};
+    state.lists.forEach(list => {
+      columns[list.id] = state.tasks.filter(task => task.status === list.id).sort((a, b) => a.position - b.position);
+    });
 
-    // 2. Tìm task đang được di chuyển
-    const getSourceColumn = columns[sourceStatus];
-    const getDestColumn = columns[destinationStatus];
+    const getSourceColumn = columns[sourceStatus] || [];
+    const getDestColumn = columns[destinationStatus] || [];
     
     // Xóa task khỏi cột nguồn bằng cách Splice
     const [movedTask] = getSourceColumn.splice(sourceIndex, 1);
+    if (!movedTask) return state; // Fail safe
 
     // Cập nhật lại status nếu di chuyển sang cột khác
     movedTask.status = destinationStatus;
@@ -46,12 +63,13 @@ const useBoardStore = create((set, get) => ({
     getDestColumn.splice(destinationIndex, 0, movedTask);
 
     // 3. Tính toán lại position (trọng số) mới cho mọi task để UI và Data đồng bộ
-    // Tái cấu trúc lại mảng tasks tổng (gộp lại) 
-    const finalTasks = [
-      ...columns.todo.map((t, idx) => ({ ...t, position: idx })),
-      ...columns.doing.map((t, idx) => ({ ...t, position: idx })),
-      ...columns.done.map((t, idx) => ({ ...t, position: idx })),
-    ];
+    let finalTasks = [];
+    Object.values(columns).forEach(columnTasks => {
+      finalTasks = [
+        ...finalTasks,
+        ...columnTasks.map((t, idx) => ({ ...t, position: idx }))
+      ];
+    });
 
     return { tasks: finalTasks };
   }),

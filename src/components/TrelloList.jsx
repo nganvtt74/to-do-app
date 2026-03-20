@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { MoreHorizontal, Plus, X } from 'lucide-react';
 import { Droppable } from '@hello-pangea/dnd';
+import toast from 'react-hot-toast';
 import TrelloCard from './TrelloCard';
 
-const TrelloList = memo(({ id, title, tasks, onAddCard, onDeleteCard, onCardClick }) => {
+const TrelloList = memo(({ id, title, tasks, onAddCard, onDeleteCard, onCardClick, onClearList }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const inputRef = useRef(null);
@@ -38,7 +39,15 @@ const TrelloList = memo(({ id, title, tasks, onAddCard, onDeleteCard, onCardClic
         <h2 className="text-sm font-semibold text-[#172b4d] cursor-pointer px-1">
           {title}
         </h2>
-        <button className="p-1.5 text-[#44546f] transition-colors rounded-lg hover:bg-[#091e4214]">
+        <button 
+          onClick={() => {
+            if (window.confirm(`Bạn có chắc muốn xóa toàn bộ thẻ trong danh sách "${title}" không?`)) {
+              if (onClearList) onClearList();
+            }
+          }}
+          className="p-1.5 text-[#44546f] transition-colors rounded-lg hover:bg-[#091e4214]"
+          title="Xóa toàn bộ thẻ"
+        >
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>

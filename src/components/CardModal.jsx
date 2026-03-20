@@ -2,12 +2,6 @@ import React, { useEffect } from 'react';
 import { X, CreditCard, AlignLeft, Calendar, Layout } from 'lucide-react';
 import useForm from '../hooks/useForm';
 
-const STATUS_LABELS = {
-  todo: 'To Do',
-  doing: 'In Progress',
-  done: 'Done',
-};
-
 // Hàm validate đơn giản
 const validateTask = (values) => {
   const errors = {};
@@ -17,10 +11,11 @@ const validateTask = (values) => {
   return errors;
 };
 
-const CardModal = ({ task, onClose, onSave }) => {
+const CardModal = ({ task, lists = [], onClose, onSave }) => {
   const { values, errors, handleChange, isValid } = useForm({
     title: task.title || '',
     description: task.description || '',
+    status: task.status || 'todo',
   }, validateTask);
 
   // Đóng Modal khi nhấn Esc
@@ -38,11 +33,13 @@ const CardModal = ({ task, onClose, onSave }) => {
       onSave(task.id, {
         title: values.title.trim(),
         description: values.description.trim(),
+        status: values.status,
       });
     }
   };
 
-  const currentStatus = STATUS_LABELS[task.status] || 'Không xác định';
+  const currentList = lists.find(l => l.id === task.status);
+  const currentStatus = currentList ? currentList.title : 'Không xác định';
   // Mock ngày tạo nếu task k có
   const createdAt = task.createdAt 
     ? new Date(task.createdAt).toLocaleString('vi-VN') 
@@ -113,7 +110,16 @@ const CardModal = ({ task, onClose, onSave }) => {
                 <div className="flex items-center gap-2 px-3 py-2 text-sm bg-[#091e420f] rounded-md font-medium text-[#172b4d]">
                   <Layout className="w-4 h-4 text-[#44546f]" />
                   <span>Trạng thái: </span>
-                  <span className="ml-auto">{currentStatus}</span>
+                  <select
+                    name="status"
+                    value={values.status}
+                    onChange={handleChange}
+                    className="ml-auto bg-transparent focus:outline-none cursor-pointer text-sm text-[#172b4d] font-semibold"
+                  >
+                    {lists.map(list => (
+                      <option key={list.id} value={list.id}>{list.title}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2 mt-2 text-sm bg-[#091e420f] rounded-md font-medium text-[#172b4d]">
                   <Calendar className="w-4 h-4 text-[#44546f]" />

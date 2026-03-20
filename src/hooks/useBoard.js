@@ -4,7 +4,7 @@ import useBoardStore from '../store/boardStore';
 import { fetchTasksApi, updateTaskApi, createTaskApi, deleteTaskApi } from '../services/api';
 
 const useBoard = () => {
-  const { tasks, setTasks, addTask, updateTask, deleteTask, moveTask } = useBoardStore();
+  const { tasks, lists, setTasks, addList, deleteTasksByList, addTask, updateTask, deleteTask, moveTask } = useBoardStore();
   const [loading, setLoading] = useState(false);
 
   // Hàm loadTasks gọi API thật
@@ -91,20 +91,22 @@ const useBoard = () => {
   }, [updateTask, setTasks]);
 
   // Lọc và phân loại các task theo cột, đồng thời sắp xếp theo position
-  const boardData = {
-    todo: tasks.filter((task) => task.status === 'todo').sort((a, b) => a.position - b.position),
-    doing: tasks.filter((task) => task.status === 'doing').sort((a, b) => a.position - b.position),
-    done: tasks.filter((task) => task.status === 'done').sort((a, b) => a.position - b.position),
-  };
+  const boardData = lists.reduce((acc, list) => {
+    acc[list.id] = tasks.filter((task) => task.status === list.id).sort((a, b) => a.position - b.position);
+    return acc;
+  }, {});
 
   return {
     tasks,
+    lists,          // Export lists để UI map ra các cột
     boardData,
     loading,
     fetchTasks,
     addTask,
     updateTask,
     deleteTask,
+    addList,        // Export hàm thêm cột mới
+    deleteTasksByList, // Export hàm xoá toàn bộ thẻ trong 1 cột
     handleMoveTask, // Export hàm mới ra để UI xài
     handleAddCard,
     handleDeleteCard,

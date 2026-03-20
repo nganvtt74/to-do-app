@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Search, Bell, Grid, Star, Users, Briefcase } from 'lucide-react';
 import { DragDropContext } from '@hello-pangea/dnd';
+import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import useAuth from '../hooks/useAuth';
 import useBoard from '../hooks/useBoard';
@@ -10,8 +11,11 @@ import CardModal from '../components/CardModal';
 const DashboardPage = () => {
   const { logout } = useAuth();
   const user = useAuthStore((state) => state.user);
-  const { boardData, fetchTasks, loading, handleMoveTask, handleAddCard, handleDeleteCard, handleUpdateCardDetails } = useBoard();
+  const { boardData, lists, addList, deleteTasksByList, fetchTasks, loading, handleMoveTask, handleAddCard, handleDeleteCard, handleUpdateCardDetails } = useBoard();
   const [selectedCard, setSelectedCard] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListName, setNewListName] = useState('');
   
   // Dùng ref để đảm bảo fetchTasks chỉ gọi đúng 1 lần (strict mode safe)
   const isFetched = useRef(false);
@@ -49,6 +53,30 @@ const DashboardPage = () => {
     );
   }, [handleMoveTask]);
 
+  // Bộ lọc task dựa trên thanh Search
+  const filteredBoardData = useMemo(() => {
+    if (!searchQuery.trim()) return boardData;
+    const lowerQuery = searchQuery.toLowerCase();
+    const filterFn = (task) => 
+      task.title.toLowerCase().includes(lowerQuery) || 
+      (task.description && task.description.toLowerCase().includes(lowerQuery));
+
+    return lists.reduce((acc, list) => {
+      acc[list.id] = (boardData[list.id] || []).filter(filterFn);
+      return acc;
+    }, {});
+  }, [boardData, searchQuery, lists]);
+
+  const handleAddListSubmit = (e) => {
+    e.preventDefault();
+    if (newListName.trim()) {
+      addList(newListName.trim());
+      setNewListName('');
+      setIsAddingList(false);
+      toast.success('Đã thêm danh sách mới');
+    }
+  };
+
   const avatarLetter = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
   return (
@@ -83,7 +111,9 @@ const DashboardPage = () => {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/80 group-focus-within:text-[#172b4d]" />
             <input 
               type="text" 
-              placeholder="Tìm kiếm" 
+              placeholder="Tìm kiếm thẻ..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-3 py-1.5 w-48 md:w-64 bg-white/20 rounded-md text-white text-sm placeholder:text-white/80 focus:outline-none focus:bg-white focus:text-[#172b4d] focus:w-80 transition-all duration-300"
             />
           </div>
@@ -140,15 +170,65 @@ const DashboardPage = () => {
               </div>
             ) : (
               <>
-                <TrelloList id="todo" title="To Do" tasks={boardData.todo} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onCardClick={setSelectedCard} />
-                <TrelloList id="doing" title="In Progress" tasks={boardData.doing} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onCardClick={setSelectedCard} />
-                <TrelloList id="done" title="Done" tasks={boardData.done} onAddCard={handleAddCard} onDeleteCard={handleDeleteCard} onCardClick={setSelectedCard} />
+                {lists.map((list) => (
+                  <TrelloList 
+                    key={list.id} 
+                    id={list.id} 
+                    title={list.title} 
+                    tasks={filteredBoardData[list.id] || []} 
+                    onAddCard={handleAddCard} 
+                    onDeleteCard={handleDeleteCard} 
+                    onCardClick={setSelectedCard} 
+                    onClearList={() => {
+                      deleteTasksByList(list.id);
+                      toast.success(`Đã xóa toàn bộ thẻ trong ${list.title}`);
+                    }}
+                  />
+                ))}
                 
                 {/* Nút thêm danh sách */}
                 <div className="shrink-0 w-[272px]">
-                  <button className="flex items-center w-full gap-2 px-3 py-3 text-[14px] font-medium text-white transition-colors bg-[#ffffff3D] rounded-xl hover:bg-[#ffffff52] text-left">
-                    <span className="text-xl leading-[0]">+</span> Thêm danh sách khác
-                  </button>
+                  {!isAddingList ? (
+                    <button 
+                      onClick={() => setIsAddingList(true)}
+                      className="flex items-center w-full gap-2 px-3 py-3 text-[14px] font-medium text-white transition-colors bg-[#ffffff3D] rounded-xl hover:bg-[#ffffff52] text-left"
+                    >
+                      <span className="text-xl leading-[0]">+</span> Thêm danh sách khác
+                    </button>
+                  ) : (
+                    <form onSubmit={handleAddListSubmit} className="p-2 bg-[#ebecf0] rounded-xl shadow-sm">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Nhập tiêu đề danh sách..."
+                        value={newListName}
+                        onChange={(e) => setNewListName(e.target.value)}
+                        onBlur={() => {
+                          if (!newListName.trim()) setIsAddingList(false);
+                        }}
+                        className="w-full px-2 py-1.5 text-sm rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0079bf] mb-2"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="submit"
+                          onMouseDown={(e) => e.preventDefault()} // Ngăn chặn onBlur kích hoạt trước click
+                          className="px-3 py-1.5 text-sm font-medium text-white bg-[#0079bf] rounded hover:bg-[#026aa7]"
+                        >
+                          Thêm danh sách
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingList(false);
+                            setNewListName('');
+                          }}
+                          className="p-1.5 text-[#42526e] hover:bg-[#091e4214] rounded"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </>
             )}
@@ -160,6 +240,7 @@ const DashboardPage = () => {
       {selectedCard && (
         <CardModal 
           task={selectedCard} 
+          lists={lists} /* Truyền danh sách qua CardModal để map dropdown */
           onClose={() => setSelectedCard(null)} 
           onSave={async (id, data) => {
             await handleUpdateCardDetails(id, data);
